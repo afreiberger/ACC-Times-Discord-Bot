@@ -5,16 +5,16 @@ from enum import Enum
 
 import aiohttp
 
-import discord
-from discord.ext import commands, tasks
+#import discord
+#from discord.ext import commands, tasks
 
 from dotenv import load_dotenv
 
-intents = discord.Intents.default()
+#intents = discord.Intents.default()
 
 load_dotenv()
 
-guild_id = os.getenv("GUILD_ID")
+#guild_id = os.getenv("GUILD_ID")
 
 
 class Tracks(Enum):
@@ -105,29 +105,58 @@ car_types = [
 
 class DiscordBot(commands.Bot):
     def __init__(self) -> None:
-        super().__init__(
-            intents=intents, help_command=None, command_prefix=commands.when_mentioned
-        )
+        #super().__init__(
+        #    intents=intents, help_command=None, command_prefix=commands.when_mentioned
+        #)
 
         self.database = None
 
-        self.database = json.load(open("db.json", "r+"))
+        #self.database = json.load(open("db.json", "r+"))
 
-    async def get_results(self) -> dict:
+    async def get_latest_results(self) -> dict:
         async with aiohttp.ClientSession() as session:
             async with session.get(
                 f"{os.getenv('BASE_URL')}/api/results/list.json"
-            ) as response:
-                result_options = await response.json()
+            ) as sessionlist:
+                logged_sessions = await sessionlist.json()
 
                 async with session.get(
-                    f"{os.getenv('BASE_URL')}{result_options['results'][0]['results_json_url']}"
-                ) as response:
-                    return await response.json()
+                    f"{os.getenv('BASE_URL')}{logged_sessions['results'][0]['results_json_url']}"
+                ) as latest_session_results:
+                    return await latest_session_results.json()
+
+    async def get_all_results(self) -> dict:
+        all_results={}
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{os.getenv('BASE_URL')}/api/results/list.json"
+            ) as sessionlist:
+                logged_sessions = await sessionlist.json()
+
+                # get all the pages of result files
+                for page in range(logged_sessions["num_pages"]:
+                    async with session.get(
+                        f"{os.getenv('BASE_URL')}/api/results/list.json?page={page}"
+                    ) as paged_result:
+                        trackfiles = await paged_result.json().get('results')
+
+                        # in each page, pull each track results file
+                        for file in trackfiles:
+                            track_name = file['track']
+                            async with session.get(
+                                f"{os.getenv('BASE_URL')}{file['results_json_url']}"
+                            ) as track_log:
+                                log = await track_log.json()
+                                if all_results.get(track_name):
+                                    all_results[track_name].add(log['sessionResult']['leaderBoardLines'])
+                                else:
+                                    all_results[track_name] = [log['sessionResult']['leaderBoardLines']]
+
+        return await all_results
 
     @tasks.loop(minutes=1.0)
     async def status_task(self) -> None:
-        results = await self.get_results()
+        results = await self.get_latest_results()
 
         track_name = results["trackName"]
 

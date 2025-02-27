@@ -173,6 +173,7 @@ async def seed_track_results(track_name, db) -> dict:
         return all_results
 
 def find_fastest_times(track_name, db):
+    return
     
 
 
